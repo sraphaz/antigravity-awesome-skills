@@ -12,6 +12,9 @@ from datetime import datetime, timezone
 GITHUB_REPO = "sickn33/antigravity-awesome-skills"
 SYNC_COMMENT_RE = re.compile(r"<!-- registry-sync: .*? -->")
 
+# Reproducible timestamp when SOURCE_DATE_EPOCH is unset (must match CI fallback).
+REPRODUCIBLE_FALLBACK_DATE = "2026-02-08T00:00:00+00:00"
+
 
 def configure_utf8_output() -> None:
     """Best-effort UTF-8 stdout/stderr on Windows without dropping diagnostics."""
@@ -116,6 +119,20 @@ def load_metadata(base_dir: str, repo: str = GITHUB_REPO) -> dict:
     live_stars = fetch_star_count(repo)
     total_stars = live_stars if live_stars is not None else current_stars or 0
 
+    # Reproducible timestamp for CI: use SOURCE_DATE_EPOCH when set, else fixed fallback
+    if os.environ.get("SOURCE_DATE_EPOCH"):
+        try:
+            ts = int(os.environ["SOURCE_DATE_EPOCH"])
+            updated_at = (
+                datetime.fromtimestamp(ts, tz=timezone.utc)
+                .replace(microsecond=0)
+                .isoformat()
+            )
+        except (ValueError, TypeError, OverflowError):
+            updated_at = REPRODUCIBLE_FALLBACK_DATE
+    else:
+        updated_at = REPRODUCIBLE_FALLBACK_DATE
+
     return {
         "repo": repo,
         "version": str(package.get("version", "0.0.0")),
@@ -125,7 +142,7 @@ def load_metadata(base_dir: str, repo: str = GITHUB_REPO) -> dict:
         "star_badge_count": format_star_badge_count(total_stars),
         "star_milestone": format_star_milestone(total_stars),
         "star_celebration": format_star_celebration(total_stars),
-        "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "updated_at": updated_at,
         "used_live_star_count": live_stars is not None,
     }
 
@@ -184,6 +201,14 @@ def apply_metadata(content: str, metadata: dict) -> str:
         f"[📚 Browse {total_skills_label} Skills](#browse-{total_skills}-skills)",
         content,
         count=1,
+    )
+    # TOC entry: keep anchor in sync with "## Browse ... Skills" heading
+    content = re.sub(
+        r"^- \[Browse \d[\d,]*\+ Skills\]\(#browse-\d+-skills\)",
+        f"- [Browse {total_skills_label} Skills](#browse-{total_skills}-skills)",
+        content,
+        count=1,
+        flags=re.MULTILINE,
     )
     content = re.sub(
         r"\*\*Welcome to the V[\d.]+ .*? Stars Celebration Release!\*\*",

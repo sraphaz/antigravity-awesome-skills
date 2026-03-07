@@ -13,6 +13,9 @@ on:
 jobs:
   validate-and-build:
     runs-on: ubuntu-latest
+    env:
+      # Reproducible build date: 2026-02-08 00:00:00 UTC (match update_readme.py / build-catalog.js fallback).
+      SOURCE_DATE_EPOCH: "1767225600"
     steps:
       - uses: actions/checkout@v4
 
@@ -99,7 +102,8 @@ jobs:
           if ! git diff --quiet; then
             echo "❌ Detected uncommitted changes produced by registry/readme/catalog scripts."
             echo
-            echo "To fix locally, run the FULL Validation Chain, then commit and push:"
+            echo "To fix locally, set SOURCE_DATE_EPOCH (same as job env above: 2026-02-08 UTC), then run the full chain and commit:"
+            echo "  export SOURCE_DATE_EPOCH=1767225600"
             echo "  npm run chain"
             echo "  npm run catalog"
             echo "  git add README.md skills_index.json data/skills_index.json data/catalog.json data/bundles.json data/aliases.json CATALOG.md"

@@ -13,6 +13,11 @@ import sys
 from _project_paths import find_repo_root
 
 
+def _posix_path(p):
+    """Normalize path to POSIX style for cross-platform consistent ids."""
+    return p.replace("\\", "/") if isinstance(p, str) else p
+
+
 def collect_skill_ids(skills_dir):
     """Return set of relative paths (skill ids) that have SKILL.md. Matches listSkillIdsRecursive behavior."""
     ids = set()
@@ -20,7 +25,7 @@ def collect_skill_ids(skills_dir):
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         if "SKILL.md" in files:
             rel = os.path.relpath(root, skills_dir)
-            ids.add(rel)
+            ids.add(_posix_path(rel))
     return ids
 
 
@@ -53,16 +58,16 @@ def main():
         w_id = w.get("id", "?")
         for step in w.get("steps", []):
             for slug in step.get("recommendedSkills", []):
-                if slug not in skill_ids:
+                if _posix_path(slug) not in skill_ids:
                     errors.append(f"workflows.json workflow '{w_id}' recommends missing skill: {slug}")
         for bid in w.get("relatedBundles", []):
             if bid not in bundle_ids:
                 errors.append(f"workflows.json workflow '{w_id}' references missing bundle: {bid}")
 
-    # Bundles: every skill in each bundle
+    # Bundles: every skill in each bundle (normalize slug so \ or / from JSON both work)
     for bid, bundle in bundles_data.get("bundles", {}).items():
         for slug in bundle.get("skills", []):
-            if slug not in skill_ids:
+            if _posix_path(slug) not in skill_ids:
                 errors.append(f"bundles.json bundle '{bid}' lists missing skill: {slug}")
 
     # Canonical bundles doc: skill links must point to existing skill dirs
@@ -71,7 +76,7 @@ def main():
         with open(bundles_md_path, "r", encoding="utf-8") as f:
             bundles_md = f.read()
         for m in re.finditer(r"\]\(\.\./\.\./skills/([^)]+)/\)", bundles_md):
-            slug = m.group(1).rstrip("/")
+            slug = _posix_path(m.group(1).rstrip("/"))
             if slug not in skill_ids:
                 errors.append(f"docs/users/bundles.md links to missing skill: {slug}")
 

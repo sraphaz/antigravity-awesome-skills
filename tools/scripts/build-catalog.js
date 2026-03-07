@@ -11,6 +11,9 @@ const { findProjectRoot } = require("../lib/project-root");
 const ROOT = findProjectRoot(__dirname);
 const SKILLS_DIR = path.join(ROOT, "skills");
 
+/** Reproducible timestamp when SOURCE_DATE_EPOCH is unset (must match update_readme.py). */
+const REPRODUCIBLE_FALLBACK_DATE_ISO = "2026-02-08T00:00:00.000Z";
+
 const STOPWORDS = new Set([
   "a",
   "an",
@@ -612,9 +615,15 @@ function renderCatalogMarkdown(catalog) {
   return lines.join("\n");
 }
 
+function toPosixPath(p) {
+  return typeof p === "string" ? p.split(path.sep).join("/") : p;
+}
+
 function buildCatalog() {
   const skillRelPaths = listSkillIdsRecursive(SKILLS_DIR);
-  const skills = skillRelPaths.map((relPath) => readSkill(SKILLS_DIR, relPath));
+  const skills = skillRelPaths.map((relPath) =>
+    readSkill(SKILLS_DIR, toPosixPath(relPath)),
+  );
   const catalogSkills = [];
 
   for (const skill of skills) {
@@ -637,7 +646,7 @@ function buildCatalog() {
   const catalog = {
     generatedAt: process.env.SOURCE_DATE_EPOCH
       ? new Date(process.env.SOURCE_DATE_EPOCH * 1000).toISOString()
-      : "2026-02-08T00:00:00.000Z",
+      : REPRODUCIBLE_FALLBACK_DATE_ISO,
     total: catalogSkills.length,
     skills: catalogSkills.sort((a, b) =>
       a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
